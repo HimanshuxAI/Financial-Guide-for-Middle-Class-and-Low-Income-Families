@@ -1,6 +1,7 @@
 import express, { Request, Response } from "express";
 import { createServer as createViteServer } from "vite";
 import path from "path";
+import OpenAI from "openai";
 import {
   ValidationError,
   analyzeProfile,
@@ -49,6 +50,11 @@ function getFinancialData(req: Request) {
 async function startServer() {
   const app = express();
   const PORT = Number(process.env.PORT || 3000);
+
+  const openai = new OpenAI({
+    baseURL: "https://integrate.api.nvidia.com/v1",
+    apiKey: "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",
+  });
 
   app.disable("x-powered-by");
   app.use(express.json({ limit: "100kb" }));
@@ -191,6 +197,39 @@ async function startServer() {
     "/api/executive-brief",
     asyncRoute((req, res) => {
       res.json(createExecutiveBrief(getFinancialData(req)));
+    })
+  );
+
+  app.post(
+    "/api/chat",
+    asyncRoute(async (req, res) => {
+      res.setHeader("Content-Type", "text/plain");
+
+      const completion = await openai.chat.completions.create({
+        model: "openai/gpt-oss-120b",
+        messages: req.body.messages || [{ role: "user", content: "" }],
+        temperature: 1,
+        top_p: 1,
+        max_tokens: 4096,
+        stream: true,
+      });
+
+      for await (const chunk of completion) {
+        if (!chunk.choices) continue;
+        
+        // @ts-expect-error accessing non-standard reasoning_content
+        const reasoning = chunk.choices[0].delta?.reasoning_content;
+        if (reasoning) {
+          res.write(reasoning);
+        }
+
+        const content = chunk.choices[0].delta?.content;
+        if (content !== null && content !== undefined) {
+          res.write(content);
+        }
+      }
+      
+      res.end();
     })
   );
 
