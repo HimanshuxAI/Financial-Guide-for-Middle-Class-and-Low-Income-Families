@@ -53,7 +53,7 @@ async function startServer() {
 
   const openai = new OpenAI({
     baseURL: "https://integrate.api.nvidia.com/v1",
-    apiKey: "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",
+    apiKey: process.env.NVIDIA_API_KEY,
   });
 
   app.disable("x-powered-by");
